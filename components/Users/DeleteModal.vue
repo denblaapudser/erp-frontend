@@ -32,6 +32,9 @@
         <UTooltip
             text="Slet bruger"
             :delay-duration="0"
+            :content="{
+                side: 'left',
+            }"
         >
             <UButton :disabled="disabled" type="button" variant="ghost" color="error" icon="i-lucide-trash-2" class="cursor-pointer" @click="open = true"/>
         </UTooltip>

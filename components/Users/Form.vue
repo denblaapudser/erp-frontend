@@ -4,6 +4,8 @@
 
     const { accessService, userService } = useServices();
     const accessItems = await accessService.get();
+    const accessParents = accessItems.filter(item => item.child_of === null);
+    const accessChildren = accessItems.filter(item => item.child_of !== null);
     const buisy = ref(false);
 
     const props = defineProps({
@@ -29,29 +31,69 @@
             .max(100, 'Navn må højst være 100 tegn')
             .regex(/^[a-zA-ZæøåÆØÅ\s]+$/, 'Navn må kun indeholde bogstaver og mellemrum')
             .refine(val => val.trim().split(' ').length >= 2, {
-                message: 'Indtast fornavn og efternavn',
+            message: 'Indtast fornavn og efternavn',
             }),
         email: z.string()
-            .nonempty('Email er påkrævet')
-            .email('Indtast en gyldig email'),
+            .optional()
+            .refine(val => !val || z.string().email().safeParse(val).success, {
+            message: 'Indtast en gyldig email'
+            }),
         password: z.string()
-            .refine(val => {
-                if (props.updating) {
-                    // Allow empty string or at least 8 characters when updating
-                    return val === '' || val.length >= 8;
-                }
-                // When creating, require at least 8 characters
-                return val.length >= 8;
-            }, {
-                message: 'Adgangskode skal være mindst 8 tegn',
-            })
+            .optional(),
+        pin: z.string()
+            .length(4, 'PIN skal være 4 cifre')
+            .regex(/^\d{4}$/, 'PIN skal kun indeholde cifre')
+            .optional(),
+        accesses: z.array(z.number()).optional().default([]), 
+        })
+        .superRefine((data, ctx) => {
+            const adminAccessId = 1;
+            const isAdminSelected = data.accesses?.includes(adminAccessId);
+            const isPasswordMissing = !data.password || data.password.length < 8;
+
+            if (isAdminSelected && isPasswordMissing) {
+                ctx.addIssue({
+                path: ['password'],
+                code: z.ZodIssueCode.custom,
+                message: 'Adgangskode er påkrævet, når admin adgang er valgt og skal være mindst 8 tegn'
+                });
+            }
+        });
+
+    async function generatePin() {
+        const pinData = await userService.generatePin();
+        const pin = pinData.pin;
+        return pin;
+    }
+
+    const generateUsernameFromName = computed(() => {
+        if (props.user && props.user.username) {
+            return props.user.username;
+        }
+        if (state.value.name) {
+            const names = state.value.name.trim().toLowerCase().split(' ');
+            if (names.length >= 2) {
+                return `${names[0].slice(0, 4)}${names[names.length - 1].slice(0, 4)}`;
+            } else {
+                return names[0].slice(0, 8);
+            }
+        }
+        return '';
     });
+
+    const DEFAULT_EMPLOYEE_ACCESS_ID = 4;
+
+    const initialAccesses =
+    props.user?.accesses?.map(a => a.id) ??
+    (!props.updating ? [DEFAULT_EMPLOYEE_ACCESS_ID] : []);
 
     const state = ref({
         name: props.user?.name || '',
         email: props.user?.email || '',
-        accesses: props.user?.accesses?.map(a => a.id) || [],
-        password: ''
+        accesses: initialAccesses,
+        password: '',
+        pin: props.user?.pin ? '' : await generatePin(),
+        username: props.user?.username || generateUsernameFromName,
     });
 
     async function saveChanges() {
@@ -61,7 +103,11 @@
             name: state.value.name,
             email: state.value.email,
             accesses: state.value.accesses,
-            password: state.value.password
+            username: state.value.username,
+            ...(props.updating ? {} : {
+                password: state.value.password,
+                pin: state.value.pin,
+            }),
         });
         if (successful) {
             emit('update:editing', false);
@@ -70,22 +116,26 @@
         buisy.value = false;
     }
 
-    function cancel() {
+    async function cancel() {
         emit('update:editing', false);
         state.value = {
             name: props.user?.name || '',
             email: props.user?.email || '',
             password: '',
-            accesses: props.user?.accesses?.map(a => a.id) || []
+            accesses: props.user?.accesses?.map(a => a.id) || [],
+            pin: props.user?.pin ? '' : await generatePin(),
+            username: props.user?.username || ''
         };
     }
 
-    function reset(){
+    async function reset(){
         state.value = {
             name: props.user?.name || '',
             email: props.user?.email || '',
             password: '',
-            accesses: props.user?.accesses?.map(a => a.id) || []
+            accesses: props.user?.accesses?.map(a => a.id) || [],
+            pin: props.user?.pin ? '' : await generatePin(),
+            username: props.user?.username || ''
         };
     }
 
@@ -94,6 +144,28 @@
             reset();
         }
     });
+
+    function toggleAccess(id) {
+    const isParent = accessParents.some(p => p.id === id);
+    const isChecked = state.value.accesses.includes(id);
+
+    if (isChecked) {
+        // Fjern adgang
+        state.value.accesses = state.value.accesses.filter(a => a !== id);
+
+        // Hvis det er en parent, fjern også dets children
+        if (isParent) {
+        const childIds = accessChildren
+            .filter(c => c.child_of === id)
+            .map(c => c.id);
+
+        state.value.accesses = state.value.accesses.filter(a => !childIds.includes(a));
+        }
+    } else {
+        // Tilføj adgang (parent eller child)
+        state.value.accesses.push(id);
+    }
+    }
 
     defineExpose({
         saveChanges,
@@ -113,8 +185,25 @@
                     :readonly="!editing"
                 />
             </UFormField>
+
+            <UFormField label="Brugernavn" name="username" :hint="editing ? 'Valgfri' : undefined">
+                <UInput
+                    v-model="state.username"
+                    label="Brugernavn"
+                    placeholder="Indtast dit brugernavn"
+                    type="text"
+                    class="w-full"
+                    :variant="editing ? 'outline' : 'none'"
+                    :readonly="!editing"
+                />
+            </UFormField>
     
-            <UFormField label="Email" name="email">
+            <UFormField 
+                label="Email" 
+                name="email" 
+                :hint="editing ? 'Valgfri' : undefined"
+                :help="editing ? 'Til at modtage notifikationer' : undefined"
+                >
                 <UInput
                     v-model="state.email"
                     label="Email"
@@ -126,9 +215,28 @@
                 />
             </UFormField>
 
+            <UFormField 
+                v-if="editing && !updating" 
+                label="PIN kode" 
+                name="pin" 
+                :hint="editing ? 'Skal være 4 cifre' : undefined" 
+                :help="editing ? 'Til login i medarbejder app' : undefined"
+                >
+                <UInput
+                    v-model="state.pin"
+                    placeholder="****"
+                    type="text"
+                    class="w-full text-white"
+                    :variant="editing ? 'outline' : 'none'"
+                    :readonly="!updating"
+                />
+            </UFormField>
 
-
-            <UFormField v-if="!updating" label="Adgangskode" name="password">
+            <UFormField 
+                v-if="editing && !updating" 
+                label="Adgangskode" name="password" 
+                :help="editing ? 'Kun påkrævet hvis admin adgang er valgt' : undefined"
+                >
                 <UInput
                     v-model="state.password"
                     placeholder="**********"
@@ -138,28 +246,47 @@
                     :readonly="updating"
                 />
             </UFormField>
-
-            <UFormField v-if="editing" label="Adgange" name="accesses" class="w-full col-span-2">
-                <UCheckboxGroup
-                    v-model="state.accesses"
-                    value-key="id"
-                    :items="accessItems"
-                    orientation="horizontal"
-                    :ui="{
-                        fieldset: 'grid grid-cols-2 gap-4',
-                    }"
-                    />
-            </UFormField>
-            <div v-else>
-                <span class="text-sm font-medium">Adgange:</span>
-                <ul v-if="user?.accesses && user.accesses.length > 0" class="m-2">
-                    <li v-for="access in user.accesses" :key="access.id" class="text-sm text-gray-900 dark:text-white">
-                        {{ access.label }}
-                    </li>
-                </ul>
-                <span v-else class="text-sm text-gray-500 ml-2">ingen adgang</span>
-            </div>
         </div>
+        <USeparator class="my-5" />
+        <UFormField label="Adgange" name="accesses" class="col-span-2">
+            <div class="space-y-4">
+                <div
+                    v-for="parent in accessParents"
+                    :key="parent.id"
+                    class="border border-muted p-4 rounded-md space-y-2"
+                    >
+                    <!-- Parent checkbox -->
+                    <UCheckbox
+                        :id="`access-parent-${parent.id}`"
+                        :label="parent.label"
+                        :description="parent.description"
+                        :model-value="state.accesses.includes(parent.id)"
+                        @update:model-value="checked => toggleAccess(parent.id)"
+                        :disabled="!editing"
+                        :color="editing ? 'primary' : 'neutral'"
+                    />
+
+                    <!-- Child checkboxes -->
+                    <div
+                        v-if="state.accesses.includes(parent.id) && accessChildren.some(c => c.child_of === parent.id)"
+                        class="mt-5 grid grid-cols-2 gap-2 pl-6"
+                    >
+                        <UCheckbox
+                            v-for="child in accessChildren.filter(c => c.child_of === parent.id)"
+                            :key="child.id"
+                            :id="`access-child-${child.id}`"
+                            :label="child.label"
+                            :description="child.description"
+                            :model-value="state.accesses.includes(child.id)"
+                            @update:model-value="checked => toggleAccess(child.id)"
+                            :disabled="!editing"
+                            :color="editing ? 'primary' : 'neutral'"
+                        />
+                    </div>
+                </div>
+            </div>
+        </UFormField>
+
 
 
         <div v-if="editing && !updating" class="mt-10 flex items-center justify-end">            

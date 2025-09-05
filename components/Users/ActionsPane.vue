@@ -35,6 +35,9 @@ function save() {
             v-if="editing"
             text="Gem ændringer"
             :delay-duration="0"
+            :content="{
+                side: 'left',
+            }"
         >
             <UButton 
                 type="button" 
@@ -53,6 +56,9 @@ function save() {
             v-if="!editing"
             text="Rediger bruger"
             :delay-duration="0"
+            :content="{
+                side: 'left',
+            }"
         >          
             <UButton 
                 v-if="!editing"
@@ -70,6 +76,9 @@ function save() {
             v-else
             text="Stop redigering"
             :delay-duration="0"
+            :content="{
+                side: 'left',
+            }"
         >
             <UButton 
                 type="button" 
@@ -84,6 +93,21 @@ function save() {
         </UTooltip>
 
         <USeparator />
+
+        <UsersChangePasswordModal
+            v-if="!editing"
+            :user="user"
+        />
+
+        <USeparator v-if="!editing"/>
+
+        <UsersChangePinModal
+            v-if="!editing"
+            :user="user"
+        />
+
+
+        <USeparator v-if="!editing" />
 
         <UsersDeleteModal
             :user="user"

@@ -38,7 +38,7 @@ const tabItems = [
 const dialogContentClass = computed(() => {
     switch (activeTab.value) {
         case 'info':
-            return 'max-w-xl w-full';
+            return 'max-w-2xl w-full';
         case 'activity':
             return 'max-w-3xl w-full';
         default:

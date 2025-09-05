@@ -150,5 +150,60 @@ export const userService = () => {
                 });
             }
         },
+
+        generatePin: async () => {
+            try {
+                return await client(`${resource}/generate-pin`, { method: 'GET' });
+            } catch (error) {
+                toast.add({
+                    title: 'Fejl ved generering af PIN',
+                    description: httpErrorText(error),
+                    color: 'error',
+                    icon: 'i-mdi-alert'
+                });
+            }
+        },
+
+        changePassword: async (userId, newPassword) => {
+            try {
+                const response = await client(`${resource}/${userId}/admin/update-password`, { method: 'PUT', body: { password: newPassword } });
+                toast.add({ 
+                    title: 'Password opdateret', 
+                    description: response.message, 
+                    color: 'success', 
+                    icon: 'i-mdi-check' 
+                });
+                return true;
+            } catch (error) {
+                toast.add({ 
+                    title: 'Der skete en fejl', 
+                    description: httpErrorText(error), 
+                    color: 'error', 
+                    icon: 'i-mdi-alert' 
+                });
+                return false;
+            }
+        },
+
+        changePin: async (userId, newPin) => {
+            try {
+                const response = await client(`${resource}/${userId}/admin/update-pin`, { method: 'PUT', body: { pin: newPin } });
+                toast.add({ 
+                    title: 'Pin kode opdateret', 
+                    description: response.message, 
+                    color: 'success', 
+                    icon: 'i-mdi-check' 
+                });
+                return true;
+            } catch (error) {
+                toast.add({ 
+                    title: 'Der skete en fejl', 
+                    description: httpErrorText(error), 
+                    color: 'error', 
+                    icon: 'i-mdi-alert' 
+                });
+                return false;
+            }
+        }
     };
 }

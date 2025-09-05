@@ -5,6 +5,9 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui', 'nuxt-auth-sanctum', '@nuxtjs/tailwindcss'],
   css: ['~/assets/css/main.css'],
   
+  devServer: {
+    host: 'admin.erp.test',
+  },
 
   sanctum: {
     baseUrl: 'https://backend.erp.mkieler.com', // Laravel API

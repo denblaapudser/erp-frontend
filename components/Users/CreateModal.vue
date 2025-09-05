@@ -3,7 +3,7 @@ const emit = defineEmits(['update:open']);
 </script>
 
 <template>
-    <UModal title="Opret ny bruger" @update:open="emit('update:open', $event)">
+    <UModal title="Opret ny bruger" @update:open="emit('update:open', $event)" :ui="{content: 'max-w-2xl w-full'}">
         <UButton 
             class="cursor-pointer" 
             icon="i-lucide-plus"

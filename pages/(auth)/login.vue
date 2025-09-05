@@ -8,13 +8,13 @@
 
 
     const schema = z.object({
-        email: z.string().email('Indtast en gyldig e-mail'),
+        username: z.string(),
         password: z.string().min(1, 'Må ikke være tom'),
         rememberMe: z.boolean().optional()
     })
 
     const userCredentials = ref({
-        email: '',
+        username: '',
         password: ''
     })
 
@@ -32,11 +32,11 @@
             <SharedLogo class="mb-10"/>
             <UCard variant="subtle" class="shadow-xl max-w-sm w-full">
                 <UForm :schema="schema" :state="userCredentials" class="flex flex-col gap-4" @submit.prevent="onSubmit" >
-                    <UFormField label="Email" name="email">
+                    <UFormField label="Email eller brugernavn" name="username">
                         <UInput 
-                            v-model="userCredentials.email" 
-                            placeholder="Enter your email" 
-                            icon="fa6-regular:envelope" 
+                            v-model="userCredentials.username" 
+                            placeholder="Indtast email eller brugernavn" 
+                            icon="i-lucide-user" 
                             class="w-full" 
                             size="xl"
                             :ui="{ 
@@ -51,7 +51,7 @@
                             placeholder="Password"
                             class="w-full"
                             size="xl"
-                            icon="fa6-solid:lock"
+                            icon="i-lucide-lock"
                             
                             :type="showPassword ? 'text' : 'password'"
                             :ui="{ 

@@ -135,7 +135,7 @@ onMounted(loadUsers)
                 }),
                 h('div', undefined, [
                   h('p', { class: 'font-medium text-highlighted' }, row.original.name),
-                  h('p', { class: '' }, row.original.email)
+                  h('p', { class: '' }, `@${row.original.username}`)
                 ])
               ])
             } 
